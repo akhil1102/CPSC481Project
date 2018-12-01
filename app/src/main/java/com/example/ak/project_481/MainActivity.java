@@ -40,7 +40,6 @@ public class MainActivity extends AppCompatActivity {
 
     private CameraKitView cameraKitView;
     private FloatingActionButton photoButton;
-    private FrameLayout framePreview;
     private RecyclerView recyclerView;
     private ItemAdapter itemAdapter;
     private List<FirebaseVisionLabel> labels = new ArrayList<>();
@@ -60,8 +59,8 @@ public class MainActivity extends AppCompatActivity {
         mGraphicOverlay = findViewById(R.id.graphic_overlay);
         photoButton = findViewById(R.id.photoButton);
         photoButton.setOnClickListener(photoOnClickListener);
-        View bottomSheet = findViewById(R.id.bottom_sheet);
-        sheetBehavior = BottomSheetBehavior.from(bottomSheet);
+//        View bottomSheet = findViewById(R.id.bottom_sheet);
+//        sheetBehavior = BottomSheetBehavior.from(bottomSheet);
 
         drawerLayout = findViewById(R.id.drawer_layout);
 
@@ -158,13 +157,22 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onImage(CameraKitView cameraKitView, byte[] picture) {
                     Bitmap result = BitmapFactory.decodeByteArray(picture, 0, picture.length);
-                    //getLabelsFromDevice(result);
-                    runTextRecognition(result);
+                    showBottomSheetDialog();
+                    getLabelsFromDevice(result);
+//                    runTextRecognition(result);
                 }
             });
-//            showBottomSheetDialog();
         }
     };
+
+    public void showBottomSheetDialog() {
+//        recyclerView = view.findViewById(R.id.rvLabels);
+//        itemAdapter = new ItemAdapter(MainActivity.this, labels );
+//        recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
+//        recyclerView.setAdapter(itemAdapter);
+        BottomSheetLabelFragment labels = new BottomSheetLabelFragment();
+        labels.show(getSupportFragmentManager(), "");
+    }
 
     private void getLabelsFromDevice(Bitmap bitmap){
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(bitmap);
@@ -174,6 +182,11 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onSuccess(List<FirebaseVisionLabel> firebaseVisionLabels) {
                 labels.clear();
+                View view = getLayoutInflater().inflate(R.layout.fragment_bottom_sheet, null);
+                recyclerView = view.findViewById(R.id.rvLabels);
+                itemAdapter = new ItemAdapter(MainActivity.this, labels );
+                recyclerView.setAdapter(itemAdapter);
+                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
                 labels.addAll(firebaseVisionLabels);
                 itemAdapter.notifyDataSetChanged();
                 for (FirebaseVisionLabel label : firebaseVisionLabels) {
@@ -192,19 +205,15 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                recyclerView = findViewById(R.id.rvLabels);
-                itemAdapter = new ItemAdapter(MainActivity.this, labels );
-                recyclerView.setAdapter(itemAdapter);
-                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
-                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
+//                recyclerView = findViewById(R.id.rvLabels);
+//                itemAdapter = new ItemAdapter(MainActivity.this, labels );
+//                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
+//                recyclerView.setAdapter(itemAdapter);
+//                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
             }
         });
     }
-    public void showBottomSheetDialog() {
-        //View view = getLayoutInflater().inflate(R.layout.fragment_bottom_sheet, null);
-        BottomSheetLabelFragment labels = new BottomSheetLabelFragment();
-        labels.show(getSupportFragmentManager(), "");
-    }
+
 
     private void runTextRecognition(final Bitmap bitmap){
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(bitmap);
