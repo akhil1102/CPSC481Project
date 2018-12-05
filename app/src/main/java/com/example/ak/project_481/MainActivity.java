@@ -7,17 +7,20 @@ import android.support.annotation.NonNull;
 import android.support.design.widget.BottomSheetBehavior;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
+import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
+import android.support.v4.widget.NestedScrollView;
+import android.support.v7.app.ActionBar;
+import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
+import android.support.v7.widget.Toolbar;
 import android.util.Log;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.widget.Button;
-import android.widget.FrameLayout;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.Toast;
 
@@ -43,11 +46,13 @@ public class MainActivity extends AppCompatActivity {
     private RecyclerView recyclerView;
     private ItemAdapter itemAdapter;
     private List<FirebaseVisionLabel> labels = new ArrayList<>();
-    BottomSheetBehavior sheetBehavior;
     private GraphicOverlay mGraphicOverlay;
     private ImageView imageView;
     boolean doubleBackToExitPressedOnce = false;
     private DrawerLayout drawerLayout;
+    private NestedScrollView nestedScrollView;
+    private RecyclerView rvLabels;
+    private NavigationView navigationView;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,41 +67,39 @@ public class MainActivity extends AppCompatActivity {
 //        View bottomSheet = findViewById(R.id.bottom_sheet);
 //        sheetBehavior = BottomSheetBehavior.from(bottomSheet);
 
+        nestedScrollView = findViewById(R.id.nestedSV);
+        nestedScrollView.setVisibility(View.GONE);
+        rvLabels = findViewById(R.id.rvLabels);
+        rvLabels.setVisibility(View.GONE);
+        itemAdapter = new ItemAdapter(MainActivity.this, labels );
+        rvLabels.setLayoutManager(new LinearLayoutManager(MainActivity.this));
+        rvLabels.setAdapter(itemAdapter);
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
         drawerLayout = findViewById(R.id.drawer_layout);
-
-        NavigationView navigationView = findViewById(R.id.nav_view);
+        ActionBar actionbar = getSupportActionBar();
+        actionbar.setDisplayHomeAsUpEnabled(true);
+        actionbar.setHomeAsUpIndicator(R.drawable.ic_menu);
+        navigationView = findViewById(R.id.nav_view);
+        navigationView.getMenu().getItem(0).setChecked(true);
         navigationView.setNavigationItemSelectedListener(new NavigationView.OnNavigationItemSelectedListener() {
             @Override
             public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
                 menuItem.setChecked(true);
                 drawerLayout.closeDrawers();
-                Toast.makeText(MainActivity.this, "My Account",Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, menuItem.getTitle(),Toast.LENGTH_SHORT).show();
                 return true;
             }
         });
-        //ImageButton btnRetry = findViewById(R.id.btnRetry);
-//        btnRetry.setOnClickListener(new View.OnClickListener() {
-//            @Override
-//            public void onClick(View v) {
-//                if(cameraKitView.getVisibility()==View.VISIBLE){
-//                    showPreview();
-//                }else{
-//                    hidePreview();
-//                }
-//            }
-//        });
-        //sheetBehavior.setPeekHeight(224);
-//        sheetBehavior.setBottomSheetCallback(new BottomSheetBehavior.BottomSheetCallback() {
-//            @Override
-//            public void onStateChanged(@NonNull View view, int i) {
-//
-//            }
-//
-//            @Override
-//            public void onSlide(@NonNull View view, float v) {
-//
-//            }
-//        });
+    }
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+            case android.R.id.home:
+                drawerLayout.openDrawer(GravityCompat.START);
+                return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
     @Override
     protected void onResume() {
@@ -113,6 +116,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onBackPressed(){
         imageView.setVisibility(View.GONE);
+        nestedScrollView.setVisibility(View.GONE);
         cameraKitView.onResume();
         mGraphicOverlay.clear();
         if(doubleBackToExitPressedOnce) {
@@ -157,38 +161,51 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onImage(CameraKitView cameraKitView, byte[] picture) {
                     Bitmap result = BitmapFactory.decodeByteArray(picture, 0, picture.length);
-                    showBottomSheetDialog();
-                    getLabelsFromDevice(result);
-//                    runTextRecognition(result);
+//                    showBottomSheetDialog();
+                    Log.d("item id:",Integer.toString(getCheckedItem(navigationView)));
+                    if(getCheckedItem(navigationView)==0){
+                        getLabelsFromDevice(result);
+                    }else if (getCheckedItem(navigationView)==1){
+                        runTextRecognition(result);
+                    }
                 }
             });
         }
     };
+    private int getCheckedItem(NavigationView navigationView) {
+        Menu menu = navigationView.getMenu();
+        for (int i = 0; i < menu.size(); i++) {
+            MenuItem item = menu.getItem(i);
+            if (item.isChecked()) {
+                return i;
+            }
+        }
 
-    public void showBottomSheetDialog() {
-//        recyclerView = view.findViewById(R.id.rvLabels);
-//        itemAdapter = new ItemAdapter(MainActivity.this, labels );
-//        recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
-//        recyclerView.setAdapter(itemAdapter);
-        BottomSheetLabelFragment labels = new BottomSheetLabelFragment();
-        labels.show(getSupportFragmentManager(), "");
+        return -1;
     }
 
-    private void getLabelsFromDevice(Bitmap bitmap){
+    public void showBottomSheetDialog() {
+
+//        View view = getLayoutInflater().inflate(R.layout.fragment_bottom_sheet, null);
+
+        BottomSheetLabelFragment labelFragment = new BottomSheetLabelFragment();
+        recyclerView = findViewById(R.id.rvLabels);
+        itemAdapter = new ItemAdapter(MainActivity.this, labels );
+        recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
+        labelFragment.show(getSupportFragmentManager(), "");
+    }
+
+    private void getLabelsFromDevice(final Bitmap bitmap){
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(bitmap);
         FirebaseVisionLabelDetector detector = FirebaseVision.getInstance().getVisionLabelDetector();
-
         detector.detectInImage(image).addOnSuccessListener(new OnSuccessListener<List<FirebaseVisionLabel>>() {
             @Override
             public void onSuccess(List<FirebaseVisionLabel> firebaseVisionLabels) {
                 labels.clear();
-                View view = getLayoutInflater().inflate(R.layout.fragment_bottom_sheet, null);
-                recyclerView = view.findViewById(R.id.rvLabels);
-                itemAdapter = new ItemAdapter(MainActivity.this, labels );
-                recyclerView.setAdapter(itemAdapter);
-                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
                 labels.addAll(firebaseVisionLabels);
                 itemAdapter.notifyDataSetChanged();
+
+//                rvLabels.setAdapter(itemAdapter);
                 for (FirebaseVisionLabel label : firebaseVisionLabels) {
                     Log.d("label", label.getLabel());
                     Log.d("label", Float.toString(label.getConfidence()));
@@ -205,6 +222,11 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                imageView.setImageBitmap(bitmap);
+                cameraKitView.onPause();
+                imageView.setVisibility(View.VISIBLE);
+                nestedScrollView.setVisibility(View.VISIBLE);
+                rvLabels.setVisibility(View.VISIBLE);
 //                recyclerView = findViewById(R.id.rvLabels);
 //                itemAdapter = new ItemAdapter(MainActivity.this, labels );
 //                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
