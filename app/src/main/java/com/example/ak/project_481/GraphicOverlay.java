@@ -15,20 +15,8 @@ import java.util.Set;
  * A view which renders a series of custom graphics to be overlayed on top of an associated preview
  * (i.e., the camera preview). The creator can add graphics objects, update the objects, and remove
  * them, triggering the appropriate drawing and invalidation within the view.
- * <p>
- * <p>Supports scaling and mirroring of the graphics relative the camera's preview properties. The
- * idea is that detection items are expressed in terms of a preview size, but need to be scaled up
- * to the full view size, and also mirrored in the case of the front-facing camera.
- * <p>
- * <p>Associated {@link Graphic} items should use the following methods to convert to view
+ * Associated {Graphic} items should use the following methods to convert to view
  * coordinates for the graphics that are drawn:
- * <p>
- * <ol>
- * <li>{@link Graphic#scaleX(float)} and {@link Graphic#scaleY(float)} adjust the size of the
- * supplied value from the preview scale to the view scale.
- * <li>{@link Graphic#translateX(float)} and {@link Graphic#translateY(float)} adjust the
- * coordinate from the preview's coordinate system to the view coordinate system.
- * </ol>
  */
 public class GraphicOverlay extends View {
     private final Object lock = new Object();
@@ -53,15 +41,7 @@ public class GraphicOverlay extends View {
 
         /**
          * Draw the graphic on the supplied canvas. Drawing should use the following methods to convert
-         * to view coordinates for the graphics that are drawn:
-         * <p>
-         * <ol>
-         * <li>{@link Graphic#scaleX(float)} and {@link Graphic#scaleY(float)} adjust the size of the
-         * supplied value from the preview scale to the view scale.
-         * <li>{@link Graphic#translateX(float)} and {@link Graphic#translateY(float)} adjust the
-         * coordinate from the preview's coordinate system to the view coordinate system.
-         * </ol>
-         *
+         * to view coordinates for the graphics that are drawn.
          * @param canvas drawing canvas
          */
         public abstract void draw(Canvas canvas);

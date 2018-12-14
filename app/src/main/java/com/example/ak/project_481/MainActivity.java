@@ -2,18 +2,18 @@ package com.example.ak.project_481;
 
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+
 import android.os.Handler;
 import android.support.annotation.NonNull;
-import android.support.design.widget.BottomSheetBehavior;
 import android.support.design.widget.FloatingActionButton;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
 import android.support.v4.widget.NestedScrollView;
 import android.support.v7.app.ActionBar;
-import android.support.v7.app.ActionBarDrawerToggle;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.widget.CardView;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.support.v7.widget.Toolbar;
@@ -22,11 +22,18 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.handlers.AsyncHandler;
+import com.amazonaws.services.translate.AmazonTranslateAsyncClient;
+import com.amazonaws.services.translate.model.TranslateTextRequest;
+import com.amazonaws.services.translate.model.TranslateTextResult;
 import com.camerakit.CameraKitView;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
+
 import com.google.firebase.ml.vision.FirebaseVision;
 import com.google.firebase.ml.vision.common.FirebaseVisionImage;
 import com.google.firebase.ml.vision.label.FirebaseVisionLabel;
@@ -43,7 +50,6 @@ public class MainActivity extends AppCompatActivity {
 
     private CameraKitView cameraKitView;
     private FloatingActionButton photoButton;
-    private RecyclerView recyclerView;
     private ItemAdapter itemAdapter;
     private List<FirebaseVisionLabel> labels = new ArrayList<>();
     private GraphicOverlay mGraphicOverlay;
@@ -53,6 +59,13 @@ public class MainActivity extends AppCompatActivity {
     private NestedScrollView nestedScrollView;
     private RecyclerView rvLabels;
     private NavigationView navigationView;
+    private static final String LOG_TAG = MainActivity.class.getSimpleName();
+    private List<String> originalTextList = new ArrayList<>();
+    private String translatedJoined = "";
+    private String originalJoined="";
+    private CardView cardView;
+    private TextView originaltv;
+    private TextView translatedtv;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -60,18 +73,14 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
         cameraKitView = findViewById(R.id.camera);
         imageView = findViewById(R.id.imagePreview);
-        //framePreview = findViewById(R.id.framePreview);
         mGraphicOverlay = findViewById(R.id.graphic_overlay);
         photoButton = findViewById(R.id.photoButton);
         photoButton.setOnClickListener(photoOnClickListener);
-//        View bottomSheet = findViewById(R.id.bottom_sheet);
-//        sheetBehavior = BottomSheetBehavior.from(bottomSheet);
-
         nestedScrollView = findViewById(R.id.nestedSV);
         nestedScrollView.setVisibility(View.GONE);
         rvLabels = findViewById(R.id.rvLabels);
         rvLabels.setVisibility(View.GONE);
-        itemAdapter = new ItemAdapter(MainActivity.this, labels );
+        itemAdapter = new ItemAdapter(MainActivity.this, labels);
         rvLabels.setLayoutManager(new LinearLayoutManager(MainActivity.this));
         rvLabels.setAdapter(itemAdapter);
         Toolbar toolbar = findViewById(R.id.toolbar);
@@ -87,11 +96,16 @@ public class MainActivity extends AppCompatActivity {
             public boolean onNavigationItemSelected(@NonNull MenuItem menuItem) {
                 menuItem.setChecked(true);
                 drawerLayout.closeDrawers();
-                Toast.makeText(MainActivity.this, menuItem.getTitle(),Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, menuItem.getTitle(), Toast.LENGTH_SHORT).show();
                 return true;
             }
         });
+        cardView = findViewById(R.id.cardview);
+        cardView.setVisibility(View.GONE);
+        originaltv = findViewById(R.id.originalString);
+        translatedtv = findViewById(R.id.translatedString);
     }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
@@ -101,6 +115,7 @@ public class MainActivity extends AppCompatActivity {
         }
         return super.onOptionsItemSelected(item);
     }
+
     @Override
     protected void onResume() {
         super.onResume();
@@ -114,12 +129,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onBackPressed(){
+    public void onBackPressed() {
+        photoButton.setVisibility(View.VISIBLE);
         imageView.setVisibility(View.GONE);
         nestedScrollView.setVisibility(View.GONE);
+        cardView.setVisibility(View.GONE);
         cameraKitView.onResume();
         mGraphicOverlay.clear();
-        if(doubleBackToExitPressedOnce) {
+        if (doubleBackToExitPressedOnce) {
             super.onBackPressed();
             return;
         }
@@ -130,7 +147,7 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void run() {
-                doubleBackToExitPressedOnce=false;
+                doubleBackToExitPressedOnce = false;
             }
         }, 2000);
     }
@@ -144,34 +161,23 @@ public class MainActivity extends AppCompatActivity {
     private View.OnClickListener photoOnClickListener = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
-//            cameraKitView.captureImage(new CameraKitView.ImageCallback() {
-//                @Override
-//                public void onImage(CameraKitView cameraKitView, byte[] photo) {
-//                    File savedPhoto = new File(Environment.getExternalStorageDirectory(), "photo.jpg");
-//                    try{
-//                        FileOutputStream outputStream = new FileOutputStream(savedPhoto.getPath());
-//                        outputStream.write(photo);
-//                    } catch(IOException e){
-//                        e.printStackTrace();
-//                        Log.e("demo", "exception in photo callback");
-//                    }
-//                }
-//            });
             cameraKitView.captureImage(new CameraKitView.ImageCallback() {
                 @Override
                 public void onImage(CameraKitView cameraKitView, byte[] picture) {
                     Bitmap result = BitmapFactory.decodeByteArray(picture, 0, picture.length);
-//                    showBottomSheetDialog();
-                    Log.d("item id:",Integer.toString(getCheckedItem(navigationView)));
-                    if(getCheckedItem(navigationView)==0){
+                    Log.d("item id:", Integer.toString(getCheckedItem(navigationView)));
+                    //depending on the mode selected the image is sent to that particular function
+                    if (getCheckedItem(navigationView) == 0) {      //0 = id of Image Labelling in the side navigation drawer
                         getLabelsFromDevice(result);
-                    }else if (getCheckedItem(navigationView)==1){
+                    } else if (getCheckedItem(navigationView) == 1) {   //1 = Text Recognition in the side navigation drawer
                         runTextRecognition(result);
+
                     }
                 }
             });
         }
     };
+
     private int getCheckedItem(NavigationView navigationView) {
         Menu menu = navigationView.getMenu();
         for (int i = 0; i < menu.size(); i++) {
@@ -184,18 +190,7 @@ public class MainActivity extends AppCompatActivity {
         return -1;
     }
 
-    public void showBottomSheetDialog() {
-
-//        View view = getLayoutInflater().inflate(R.layout.fragment_bottom_sheet, null);
-
-        BottomSheetLabelFragment labelFragment = new BottomSheetLabelFragment();
-        recyclerView = findViewById(R.id.rvLabels);
-        itemAdapter = new ItemAdapter(MainActivity.this, labels );
-        recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
-        labelFragment.show(getSupportFragmentManager(), "");
-    }
-
-    private void getLabelsFromDevice(final Bitmap bitmap){
+    private void getLabelsFromDevice(final Bitmap bitmap) {
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(bitmap);
         FirebaseVisionLabelDetector detector = FirebaseVision.getInstance().getVisionLabelDetector();
         detector.detectInImage(image).addOnSuccessListener(new OnSuccessListener<List<FirebaseVisionLabel>>() {
@@ -204,8 +199,6 @@ public class MainActivity extends AppCompatActivity {
                 labels.clear();
                 labels.addAll(firebaseVisionLabels);
                 itemAdapter.notifyDataSetChanged();
-
-//                rvLabels.setAdapter(itemAdapter);
                 for (FirebaseVisionLabel label : firebaseVisionLabels) {
                     Log.d("label", label.getLabel());
                     Log.d("label", Float.toString(label.getConfidence()));
@@ -222,25 +215,28 @@ public class MainActivity extends AppCompatActivity {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
+                photoButton.setVisibility(View.GONE);
                 imageView.setImageBitmap(bitmap);
                 cameraKitView.onPause();
                 imageView.setVisibility(View.VISIBLE);
                 nestedScrollView.setVisibility(View.VISIBLE);
                 rvLabels.setVisibility(View.VISIBLE);
-//                recyclerView = findViewById(R.id.rvLabels);
-//                itemAdapter = new ItemAdapter(MainActivity.this, labels );
-//                recyclerView.setLayoutManager(new LinearLayoutManager(MainActivity.this));
-//                recyclerView.setAdapter(itemAdapter);
-//                sheetBehavior.setState(BottomSheetBehavior.STATE_EXPANDED);
             }
         });
     }
 
 
-    private void runTextRecognition(final Bitmap bitmap){
+    private void runTextRecognition(final Bitmap bitmap) {
+        runOnUiThread(new Runnable() {
+
+            @Override
+            public void run() {
+                translatedtv.setText("");
+                originaltv.setText("");
+            }
+        });
         FirebaseVisionImage image = FirebaseVisionImage.fromBitmap(bitmap);
         FirebaseVisionTextRecognizer recognizer = FirebaseVision.getInstance().getOnDeviceTextRecognizer();
-        //mTextButton.setEnabled(false);
         recognizer.processImage(image)
                 .addOnSuccessListener(
                         new OnSuccessListener<FirebaseVisionText>() {
@@ -250,6 +246,7 @@ public class MainActivity extends AppCompatActivity {
                                 processTextRecognitionResult(texts);
                                 imageView.setImageBitmap(bitmap);
                                 cameraKitView.onPause();
+                                photoButton.setVisibility(View.GONE);
                             }
 
                         })
@@ -258,31 +255,77 @@ public class MainActivity extends AppCompatActivity {
                             @Override
                             public void onFailure(@NonNull Exception e) {
                                 // Task failed with an exception
-//                                mTextButton.setEnabled(true);
                                 e.printStackTrace();
                             }
                         });
     }
-        private void processTextRecognitionResult(FirebaseVisionText texts) {
-            List<FirebaseVisionText.TextBlock> blocks = texts.getTextBlocks();
-//            if (blocks.size() == 0) {
-//                showToast("No text found");
-//                return;
-//            }
-            //mGraphicOverlay.clear();
-            for (int i = 0; i < blocks.size(); i++) {
-                List<FirebaseVisionText.Line> lines = blocks.get(i).getLines();
-                for (int j = 0; j < lines.size(); j++) {
-                    List<FirebaseVisionText.Element> elements = lines.get(j).getElements();
-                    for (int k = 0; k < elements.size(); k++) {
-                        Log.d("text: ",elements.get(k).getText());
-                        GraphicOverlay.Graphic textGraphic = new TextGraphic(mGraphicOverlay, elements.get(k));
-                        mGraphicOverlay.add(textGraphic);
-                    }
+
+    private void processTextRecognitionResult(FirebaseVisionText texts) {
+        List<FirebaseVisionText.TextBlock> blocks = texts.getTextBlocks();
+            if (blocks.size() == 0) {
+                Toast.makeText(MainActivity.this, "Text Not Recognized", Toast.LENGTH_SHORT).show();
+                return;
+            }
+            originalJoined = "";
+            translatedJoined = "";
+        for (int i = 0; i < blocks.size(); i++) {
+            List<FirebaseVisionText.Line> lines = blocks.get(i).getLines();
+            for (int j = 0; j < lines.size(); j++) {
+                List<FirebaseVisionText.Element> elements = lines.get(j).getElements();
+                for (int k = 0; k < elements.size(); k++) {
+                    Log.d("text: ", elements.get(k).getText());
+                    originalTextList.add(elements.get(k).getText());
+                    GraphicOverlay.Graphic textGraphic = new TextGraphic(mGraphicOverlay, elements.get(k));
+                    mGraphicOverlay.add(textGraphic);
+                    originalJoined = originalJoined + " "+ elements.get(k).getText();
                 }
             }
-
-
+            getTranslatedText(originalJoined);
         }
-
     }
+
+    private void getTranslatedText(String request) {
+        AWSCredentials awsCredentials = new AWSCredentials() {
+            @Override   //ACCESS KEY REQUIRED
+            public String getAWSAccessKeyId() {
+                return "<ACCESS KEY>";
+            }
+
+            @Override   //SECRET KEY REQUIRED
+            public String getAWSSecretKey() {
+                return "<SECRET KEY>";
+            }
+        };
+        final AmazonTranslateAsyncClient translateAsyncClient = new AmazonTranslateAsyncClient(awsCredentials);
+        final TranslateTextRequest translateTextRequest = new TranslateTextRequest()
+                .withText(request)
+                .withSourceLanguageCode("auto")
+                .withTargetLanguageCode("en");
+        translateAsyncClient.translateTextAsync(translateTextRequest, new AsyncHandler<TranslateTextRequest, TranslateTextResult>() {
+            @Override
+            public void onError(Exception e) {
+                Log.e(LOG_TAG, "Error occurred in translating the text: " + e.getLocalizedMessage());
+            }
+
+            @Override
+            public void onSuccess(TranslateTextRequest request, TranslateTextResult translateTextResult) {
+                Log.d(LOG_TAG, "Original Text: " + request.getText());
+                Log.d(LOG_TAG, "Translated Text: " + translateTextResult.getTranslatedText());
+                translatedJoined = translateTextResult.getTranslatedText();
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        cameraKitView.onPause();
+                        originaltv.setText("Original text: "+originalJoined);
+                        translatedtv.setText("Translation: "+translatedJoined);
+                        Log.d("translate string", translatedtv.getText().toString());
+                        cardView.setVisibility(View.VISIBLE);
+                    }
+                });
+            }
+        });
+    }
+
+
+
+}

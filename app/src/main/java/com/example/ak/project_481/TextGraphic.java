@@ -6,6 +6,11 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import android.util.Log;
 
+import com.amazonaws.auth.AWSCredentials;
+import com.amazonaws.handlers.AsyncHandler;
+import com.amazonaws.services.translate.AmazonTranslateAsyncClient;
+import com.amazonaws.services.translate.model.TranslateTextRequest;
+import com.amazonaws.services.translate.model.TranslateTextResult;
 import com.google.firebase.ml.vision.text.FirebaseVisionText;
 
 public class TextGraphic extends GraphicOverlay.Graphic {
@@ -17,6 +22,7 @@ public class TextGraphic extends GraphicOverlay.Graphic {
     private final Paint rectPaint;
     private final Paint textPaint;
     private final FirebaseVisionText.Element element;
+
 
     TextGraphic(GraphicOverlay overlay, FirebaseVisionText.Element element) {
         super(overlay);
@@ -49,7 +55,11 @@ public class TextGraphic extends GraphicOverlay.Graphic {
         RectF rect = new RectF(element.getBoundingBox());
         canvas.drawRect(rect, rectPaint);
 
-        // Renders the text at the bottom of the box.
+//        getTranslatedText(element.getText());
         canvas.drawText(element.getText(), rect.left, rect.bottom, textPaint);
+        // Renders the text at the bottom of the box.
+//        canvas.drawText(text, rect.left, rect.bottom, textPaint);
     }
+
+
 }
